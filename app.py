@@ -5,7 +5,7 @@ import os
 from datetime import datetime
 
 # --- KONFIGURACE A STYL ---
-st.set_page_config(page_title="Iron & Soul - My Plan", layout="centered")
+st.set_page_config(page_title="Iron & Soul", layout="centered")
 
 st.markdown("""
     <style>
@@ -27,7 +27,8 @@ st.markdown("""
     }
     img { 
         border-radius: 10px; 
-        filter: grayscale(20%) contrast(110%); 
+        /* Filtr jemně doladí tvoje fotky pro jednotný styl */
+        filter: contrast(110%) brightness(90%); 
         margin-bottom: 15px;
     }
     h1, h2, h3, p, span, label { color: #ffffff !important; }
@@ -36,36 +37,35 @@ st.markdown("""
 
 DB_FILE = "workout_history.csv"
 
-# --- TVŮJ PLÁN S TVÝMI OBRÁZKY ---
-# Předpokládáme, že obrázky jsou ve stejném repozitáři na GitHubu
+# --- TVŮJ PLÁN S PŘESNÝMI NÁZVY TVÝCH SOUBORŮ ---
 workout_plan = {
     "Pondělí": [
-        ("Benchpress", 4, "benchpress.jpg"),
-        ("Military Press", 3, "military_press.jpg"),
-        ("Shyby", 4, "shyby.jpg"),
-        ("Dipy", 3, "dipy.jpg")
+        ("Benchpress", 4, "Benchpress.jpg"),
+        ("Military Press", 3, "Military Press.jpg"),
+        ("Shyby", 4, "Shyby.jpg"), # Pokud soubor chybí, appka tě upozorní
+        ("Dipy", 3, "Dips.jpg")
     ],
     "Středa": [
-        ("Dřep", 4, "drep.jpg"),
-        ("Rumunský mrtvý tah", 3, "rumunsky_mrtvy_tah.jpg"),
-        ("Předkopávání", 3, "predkopavani.jpg"),
-        ("Lýtka", 4, "lytka.jpg")
+        ("Dřep", 4, "Dřep.jpg"),
+        ("Rumunský mrtvý tah", 3, "Rumunský mrtvý tah.jpg"),
+        ("Předkopávání", 3, "Předkopávání.jpg"),
+        ("Lýtka", 4, "Lýtka.jpg")
     ],
     "Pátek": [
-        ("Přítahy činky", 4, "pritahy_cinky.jpg"),
-        ("Incline DB Press", 3, "incline_db_press.jpg"),
-        ("Facepulls", 3, "facepulls.jpg"),
-        ("Biceps", 3, "biceps.jpg")
+        ("Přítahy činky", 4, "Přítahy činky.jpg"),
+        ("Incline DB Press", 3, "Incline DB press.jpg"),
+        ("Facepulls", 3, "Facepulls.jpg"),
+        ("Biceps", 3, "Biceps.jpg")
     ],
     "Neděle": [
-        ("Mrtvý tah", 3, "mrtvy_tah.jpg"),
-        ("Legpress", 4, "legpress.jpg"),
-        ("Výpady", 3, "vypady.jpg"),
-        ("Plank", 3, "plank.jpg")
+        ("Mrtvý tah", 3, "Mrtvý tah.jpg"),
+        ("Legpress", 4, "Legpress.jpg"),
+        ("Výpady", 3, "Výpady.jpg"),
+        ("Plank", 3, "Plank.jpg")
     ]
 }
 
-# --- LOGIKA NAČÍTÁNÍ ---
+# Načtení historie
 if os.path.exists(DB_FILE):
     df_history = pd.read_csv(DB_FILE)
 else:
@@ -74,10 +74,13 @@ else:
 tab1, tab2 = st.tabs(["🏋️ TRÉNINK", "📈 PROGRES"])
 
 with tab1:
-    cols_days = st.columns(4)
     if 'current_day' not in st.session_state: st.session_state.current_day = "Pondělí"
-    for i, day_name in enumerate(workout_plan.keys()):
-        if cols_days[i].button(day_name): st.session_state.current_day = day_name
+    
+    cols_days = st.columns(4)
+    days = list(workout_plan.keys())
+    for i, day_name in enumerate(days):
+        if cols_days[i].button(day_name):
+            st.session_state.current_day = day_name
 
     selected_day = st.session_state.current_day
     st.markdown(f"## {selected_day}")
@@ -85,16 +88,16 @@ with tab1:
     new_entries = []
     for exercise, sets, img_name in workout_plan[selected_day]:
         with st.expander(f"**{exercise.upper()}**", expanded=True):
-            # Kontrola, zda obrázek existuje, jinak zobrazí info
+            # Kontrola existence tvého nahraného souboru
             if os.path.exists(img_name):
                 st.image(img_name, use_container_width=True)
             else:
-                st.warning(f"Obrázek {img_name} nebyl nalezen na GitHubu.")
+                st.info(f"Obrázek '{img_name}' zatím chybí. Nahraj ho na GitHub.")
             
             h1, h2, h3 = st.columns([1, 2, 2])
             h1.write("Série")
-            h2.write("Váha (kg)")
-            h3.write("Reps")
+            h2.write("Váha")
+            h3.write("Opak.")
 
             for s in range(1, sets + 1):
                 c1, c2, c3 = st.columns([1, 2, 2])
@@ -108,18 +111,16 @@ with tab1:
         if new_entries:
             df_history = pd.concat([df_history, pd.DataFrame(new_entries)], ignore_index=True)
             df_history.to_csv(DB_FILE, index=False)
-            st.success("Zapsáno! Dobrá práce.")
+            st.success("Trénink úspěšně zapsán!")
             st.balloons()
 
 with tab2:
-    st.title("Tvé výkony")
+    st.title("Statistiky")
     all_ex = sorted(list(set([ex for d in workout_plan.values() for ex, s, i in d])))
-    sel = st.selectbox("Vyber cvik:", all_ex)
+    sel = st.selectbox("Cvik:", all_ex)
     plot_data = df_history[df_history["Cvik"] == sel]
     if not plot_data.empty:
         daily_max = plot_data.groupby("Datum")["Váha"].max().reset_index()
         fig = px.line(daily_max, x="Datum", y="Váha", template="plotly_dark", markers=True)
-        fig.update_traces(line_color='#e60000', marker=dict(size=10))
+        fig.update_traces(line_color='#e60000')
         st.plotly_chart(fig, use_container_width=True)
-    else:
-        st.info("Zatím nemáš pro tento cvik žádná data.")
